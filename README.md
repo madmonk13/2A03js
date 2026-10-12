@@ -82,4 +82,3 @@ Results with the standard test ROMs (kept in `roms/test`, not committed):
 - Sprite overflow uses the documented behavior, not the hardware's buggy scan.
 - Not yet supported: other mappers (VRC, Sunsoft, Namco 163, MMC5, FDS),
   expansion audio, and the Zapper.
-- Not yet tried with real games; sound in particular hasn't been checked by ear.
