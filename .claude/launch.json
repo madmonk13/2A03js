@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "2a03js",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd /Volumes/Documents/Dev/2A03js && exec python3 -m http.server 2603"],
+      "port": 2603,
+      "autoPort": false
+    }
+  ]
+}

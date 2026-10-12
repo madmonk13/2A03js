@@ -1,0 +1,13 @@
+{
+  "name": "2a03js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Touch-first NES emulator for phones and desktop",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 2603",
+    "rom": "node tools/run-rom.mjs",
+    "nestest": "node tools/nestest.mjs",
+    "icons": "node tools/make-icons.mjs"
+  }
+}
