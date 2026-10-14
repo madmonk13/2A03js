@@ -8,6 +8,17 @@ resume, save states and an installable web app.
 
 Named for the Ricoh 2A03, the NES's CPU and sound chip.
 
+## Offline and install
+
+The app is a PWA: open it once while online and a service worker (`sw.js`) caches it, so it then
+starts and plays without a network, from the browser or installed to the home screen ("Add to Home
+Screen" on iOS, "Install app" in Chrome). Games you've added stay available offline. When online it
+always loads the current version from the network first, and the cache follows.
+
+Service workers only run on **https** or **localhost**: serving the folder over plain http to a
+phone on the LAN works, but without offline support. `sw.js` is generated: `npm start` rebuilds it,
+or run `npm run sw` after changing files, and commit it with them.
+
 ## Running
 
 ```bash
