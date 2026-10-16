@@ -39,14 +39,36 @@ const CACHE = '${name}-${version}';
 const FILES = ${JSON.stringify(['./', ...files], null, 2)};
 const BUNDLED = new Set(${JSON.stringify(bundled)});
 
+// Tell the app's open pages how an install is going (src/sw-update.js shows it while updating).
+const tell = async (msg) => {
+  for (const c of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) c.postMessage(msg);
+};
+
+// Install: fetch every file into the new cache, a few at a time, reporting progress. If any
+// fails (offline partway), drop the half-filled cache: the old version keeps running.
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE), total = FILES.length;
+    let next = 0, done = 0;
+    tell({ type: 'sw-progress', done, total });
+    const worker = async () => {
+      while (next < total) {
+        await cache.add(new Request(FILES[next++], { cache: 'reload' }));
+        done++;
+        if (done % 4 === 0 || done === total) tell({ type: 'sw-progress', done, total });
+      }
+    };
+    try { await Promise.all(Array.from({ length: 6 }, worker)); }
+    catch (err) { await caches.delete(CACHE); throw err; }
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys()
     .then((keys) => Promise.all(keys.filter((k) => k.startsWith('${name}-') && k !== CACHE).map((k) => caches.delete(k))))
-    .then(() => self.clients.claim()));
+    .then(() => self.clients.claim())
+    .then(() => tell({ type: 'sw-active' })));
 });
 
 self.addEventListener('fetch', (event) => {

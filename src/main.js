@@ -6,6 +6,7 @@ import { store, readRomFile, withLoading, toast } from './shared.js';
 import { library, renderLibrary } from './library.js';
 import { TouchControls } from './touch.js';
 import { encode, decode } from './emu/state.js';
+import { registerServiceWorker } from './sw-update.js';
 
 const $ = (id) => document.getElementById(id);
 const FRAME_TIME = 1 / FPS;
@@ -16,7 +17,7 @@ const DEFAULTS = {
   eightWay: true,
   dpadSize: 140,
   haptics: true,
-  hints: true,
+  hints: false,      // the touch hints (Move / Fire cards); off by default
   zones: true,       // outline each control's area
   zoneOpacity: 25,   // percent
   zoneOverlap: 25,   // percent: how far the control zones reach over the picture
@@ -36,6 +37,9 @@ const touch = new TouchControls({
 input.sources.push(touch);
 
 const settings = { ...DEFAULTS, ...(store.get('mobile') || {}) };
+// Touch hints became off by default (the zone outlines now introduce the controls); turn
+// them off once for settings saved before that.
+if (!settings.hintsOffByDefault) { settings.hints = false; settings.hintsOffByDefault = true; store.set('mobile', settings); }
 const state = { romId: null, menuOpen: false, paused: false };
 
 // Block page-level zoom/scroll gestures; this is a full-screen app.
@@ -88,17 +92,19 @@ function saveResume() {
 }
 
 function restoreResume(id) {
-  if (!settings.resume) return;
+  if (!settings.resume) return false;
   const text = store.getRaw(RESUME + id);
-  if (!text) return;
+  if (!text) return false;
   try {
     const saved = decode(text);
     if (saved.v !== RESUME_VERSION || saved.mapper !== nes.cart.name) throw new Error('stale');
     nes.loadState(saved.state);
+    return true;
   } catch {
     store.remove(RESUME + id);           // unreadable or from an older version: start fresh
     loadBattery(id);
     nes.powerOn();
+    return false;
   }
 }
 
@@ -118,7 +124,10 @@ function loadRom(bytes, name, id) {
   state.romId = res.id;
   loadBattery(res.id);
   nes.powerOn();                         // start with the save RAM in place
-  restoreResume(res.id);
+  state.resumed = restoreResume(res.id);
+  state.gameName = gameTitle(name);
+  if (!state.resumed) showBooting(state.gameName);
+  introduceZones();
   applyControls();
   if (res.stored) library.setLast(res.id);
   refreshLibrary();
@@ -194,6 +203,10 @@ function closeMenu() {
 // the veil over the game, or P on a keyboard. The game is saved for resume.
 function setPaused(paused) {
   state.paused = paused;
+  if (paused) hideBooting();
+  $('pausedGame').textContent = state.gameName || '';
+  // The control zones come back up to full strength while paused and fade down again on resume.
+  document.body.classList.toggle('zones-intro', paused);
   document.body.classList.toggle('paused', paused);
   $('paused').hidden = !paused;
   $('pauseBtn').setAttribute('aria-pressed', String(paused));
@@ -340,9 +353,30 @@ function holdButton(el, key) {
 holdButton($('selectBtn'), 'uiSelect');
 holdButton($('startBtn'), 'uiStart');
 
-// The touch-zone hints fade once the player starts playing, whether by touch,
-// mouse, keyboard or gamepad.
+// A game's display name: its file name without the extension.
+function gameTitle(name) { return (name || '').replace(/\.(zip|bin|a26|nes|gbc?|rom)$/i, ''); }
+
+// Booting: a card naming the game while it starts from power-on (not resumed); it fades after
+// 3 seconds, or on a tap.
+let bootTimer = 0;
+function showBooting(title) {
+  $('bootingGame').textContent = title;
+  const el = $('booting');
+  el.hidden = true; void el.offsetWidth; el.hidden = false;      // restart the fade
+  clearTimeout(bootTimer);
+  bootTimer = setTimeout(hideBooting, 3000);
+}
+function hideBooting() { clearTimeout(bootTimer); $('booting').hidden = true; }
+$('booting').addEventListener('pointerdown', hideBooting);
+
+// When a game loads, the control zones show at full strength over a dark backing; the
+// first touch (or key / gamepad press) fades them to the chosen opacity and the backing away.
+function introduceZones() { document.body.classList.add('zones-intro'); }
+
+// The touch-zone hints and the zone introduction fade once the player starts playing,
+// whether by touch, mouse, keyboard or gamepad.
 function dismissHints() {
+  document.body.classList.remove('zones-intro');
   if (document.body.classList.contains('show-hints')) {
     clearTimeout(hintTimer);
     hintTimer = setTimeout(() => document.body.classList.remove('show-hints'), 600);
@@ -486,7 +520,7 @@ function tick(now) {
   else {
     // A reload resumes paused, so play starts when the player is ready; one
     // frame shows where the game was left.
-    setPaused(true);
+    if (state.resumed) setPaused(true);
     nes.runFrame();
     drawNow();
   }
@@ -501,9 +535,7 @@ window.input = input;
 window.audio = audio;
 
 // Offline support: the service worker (sw.js, written by tools/build-sw.mjs)
-// caches the app so it runs without a network once installed. Browsers only
-// allow it on https or localhost.
-if ('serviceWorker' in navigator && window.isSecureContext) {
-  const register = () => navigator.serviceWorker.register('sw.js').catch(() => {});
-  if (document.readyState === 'complete') register(); else window.addEventListener('load', register);
-}
+// caches the app so it runs without a network once installed, and a new
+// version shows an update screen while it installs. Browsers only allow it on
+// https or localhost.
+registerServiceWorker('2A03js');

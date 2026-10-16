@@ -47,7 +47,8 @@ ROMs are included.
   nonlinear formula.
 - **Cartridges:** NROM (0), MMC1 (1), UxROM (2), CNROM (3), MMC3 (4, with its
   scanline IRQ), AxROM (7), MMC2 (9, Punch-Out!!), Color Dreams (11), GxROM
-  (66) and Camerica (71), from iNES or NES 2.0 headers. That covers most of
+  (66), Sunsoft FME-7 (69, with its CPU-cycle IRQ; Batman: Return of the Joker)
+  and Camerica (71), from iNES or NES 2.0 headers. That covers most of
   the library. Battery-backed RAM is saved per game on the device.
 
 ## Controls
@@ -91,5 +92,5 @@ Results with the standard test ROMs (kept in `roms/test`, not committed):
   rather than from the PPU's address line, so games that use unusual pattern
   table setups for split screens may be a line off.
 - Sprite overflow uses the documented behavior, not the hardware's buggy scan.
-- Not yet supported: other mappers (VRC, Sunsoft, Namco 163, MMC5, FDS),
-  expansion audio, and the Zapper.
+- Not yet supported: other mappers (VRC, the other Sunsoft boards, Namco 163, MMC5, FDS),
+  expansion audio (including the Sunsoft 5B on Gimmick!), and the Zapper.

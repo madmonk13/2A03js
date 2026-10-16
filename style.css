@@ -99,8 +99,12 @@ body.show-hints .zone .hint { opacity: 1; }
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.55);
   text-shadow: 0 0 2px #000, 0 0 4px #000;
   opacity: var(--zone-opacity, 0.25);
+  background-color: transparent;
+  transition: opacity 0.6s ease, background-color 0.6s ease;
   pointer-events: none;
 }
+/* Just after a game loads, and while paused: full strength on a dark backing (the first touch fades them). */
+body.zones-intro .zone .box { opacity: 1; background-color: rgba(0, 0, 0, 0.5); }
 .zone .box b {
   white-space: nowrap;
   font: 800 12px/1 ui-monospace, "SF Mono", Menlo, monospace;
@@ -468,6 +472,72 @@ label.switch input:focus-visible + i { outline: 2px solid var(--accent); outline
   #loading .cart-chip { animation: none; transform: translateY(4px); }
 }
 
+/* ---------------------------------------------------------------- update screen (src/sw-update.js) */
+
+/* While a new version installs: a cartridge filling up as its files are saved, and a bar. */
+#updating {
+  position: fixed; inset: 0; z-index: 14;
+  display: grid; place-items: center;
+  background: rgba(11, 13, 20, 0.82);
+  backdrop-filter: blur(8px);
+  opacity: 0; pointer-events: auto;
+  transition: opacity 0.3s ease;
+}
+#updating.show { opacity: 1; }
+#updating .card {
+  width: min(280px, calc(100vw - 32px));
+  padding: 22px 24px 20px;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+#updating .update-cart {
+  position: relative;
+  width: 44px; height: 52px;
+  margin: 0 auto 14px;
+  border: 2px solid var(--accent);
+  border-radius: 6px 6px 3px 3px;
+  overflow: hidden;
+}
+/* The cartridge's label window. */
+#updating .update-label {
+  position: absolute; left: 7px; right: 7px; top: 7px; height: 16px;
+  border: 1px solid var(--accent); border-radius: 2px;
+  opacity: 0.6;
+}
+#updating .update-fill {
+  position: absolute; inset: 0;
+  background: var(--accent);
+  opacity: 0.85;
+  transform: scaleY(0.04); transform-origin: bottom;
+  transition: transform 0.25s ease;
+}
+#updating .label {
+  font: 700 11px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent);
+}
+#updating .name { margin-top: 6px; font-weight: 600; }
+#updating .detail { margin-top: 6px; font-size: 12px; color: var(--dim); }
+#updating .bar {
+  height: 4px; margin-top: 14px;
+  background: var(--line); border-radius: 2px; overflow: hidden;
+}
+#updating .bar > div {
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 0.25s ease;
+}
+/* Waiting for the first progress report: the fill breathes. */
+#updating:not(.done) .update-fill { animation: update-pulse 1.4s ease-in-out infinite; }
+@keyframes update-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) {
+  #updating:not(.done) .update-fill { animation: none; }
+}
+
 #toast {
   position: fixed; left: 50%; bottom: 24px; z-index: 11;
   transform: translate(-50%, 12px);
@@ -502,3 +572,22 @@ body.paused #pauseBtn .i-play { display: block; }
 }
 #paused .card b { font-size: 20px; letter-spacing: 0.04em; }
 #paused .card span { font-size: 13px; opacity: 0.7; font-weight: 500; }
+#paused .card .game { font-size: 15px; opacity: 1; font-weight: 600; color: var(--accent-text, #7c9bff); }
+
+/* Booting: a card over the game for its first few seconds from power-on. */
+#booting {
+  position: fixed; inset: 0; z-index: 6;
+  display: grid; place-items: center;
+  -webkit-tap-highlight-color: transparent;
+  animation: boot-fade 3s ease forwards;
+}
+#booting[hidden] { display: none; }
+#booting .card {
+  display: grid; gap: 4px; justify-items: center;
+  padding: 16px 28px; border-radius: 16px;
+  background: rgba(20, 23, 34, 0.92); color: var(--text, #e6e8ef);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+#booting .card span { font-size: 13px; opacity: 0.7; font-weight: 500; letter-spacing: 0.04em; }
+#booting .card b { font-size: 20px; font-weight: 600; }
+@keyframes boot-fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }

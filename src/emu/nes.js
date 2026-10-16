@@ -36,6 +36,7 @@ export class NES {
 
   load(rom) {
     this.cart = new Cart(rom);
+    this.cartClocked = this.cart.clocked;      // carts with a CPU-cycle counter (FME-7)
     this.powerOn();
     return this.cart;
   }
@@ -133,10 +134,12 @@ export class NES {
     const ppu = this.ppu;
     this.phase = 0; ppu.tick(); this.phase = 1; ppu.tick(); this.phase = 2; ppu.tick();
     this.apu.tick();
+    if (this.cartClocked) this.cart.cpuCycle();
     while (this.stallPending > 0) {
       this.stallPending--;
       ppu.tick(); ppu.tick(); ppu.tick();
       this.apu.tick();
+      if (this.cartClocked) this.cart.cpuCycle();
       this.cpu.cycles++;
     }
   }

@@ -14,6 +14,8 @@
 //   7  AxROM    32K PRG bank, one-screen mirroring
 //   9  MMC2     Punch-Out!!: CHR banks that switch when the PPU reads tiles FD / FE
 //  11  Color Dreams, 66 GxROM: 32K PRG and 8K CHR banks
+//  69  Sunsoft FME-7: 8K PRG / 1K CHR banks, ROM or RAM at 6000, and a CPU-cycle IRQ counter
+//      (Batman: Return of the Joker, Gimmick!'s board without its 5B sound)
 //  71  Camerica: 16K PRG bank (Micro Machines, Fire Hawk)
 
 import { capture, apply } from './state.js';
@@ -24,7 +26,7 @@ export const MIRROR = {
   horizontal: [0, 0, 1, 1], vertical: [0, 1, 0, 1], single0: [0, 0, 0, 0], single1: [1, 1, 1, 1], four: [0, 1, 2, 3],
 };
 
-const NAMES = { 0: 'NROM', 1: 'MMC1', 2: 'UxROM', 3: 'CNROM', 4: 'MMC3', 7: 'AxROM', 9: 'MMC2', 11: 'Color Dreams', 66: 'GxROM', 71: 'Camerica' };
+const NAMES = { 0: 'NROM', 1: 'MMC1', 2: 'UxROM', 3: 'CNROM', 4: 'MMC3', 7: 'AxROM', 9: 'MMC2', 11: 'Color Dreams', 66: 'GxROM', 69: 'FME-7', 71: 'Camerica' };
 
 export function readHeader(rom) {
   if (rom.length < 16 || rom[0] !== 0x4E || rom[1] !== 0x45 || rom[2] !== 0x53 || rom[3] !== 0x1A) {
@@ -45,7 +47,7 @@ export function readHeader(rom) {
   };
 }
 
-const STATE = ['prgRam', 'chrRam', 'regs', 'mirror', 'irqLatch', 'irqCounter', 'irqReload', 'irqEnabled', 'irqLine', 'shift', 'shiftCount', 'latch0', 'latch1'];
+const STATE = ['prgRam', 'chrRam', 'regs', 'mirror', 'irqLatch', 'irqCounter', 'irqReload', 'irqEnabled', 'irqLine', 'shift', 'shiftCount', 'latch0', 'latch1', 'command'];
 
 export class Cart {
   saveState() { return capture(this, STATE); }
@@ -79,6 +81,7 @@ export class Cart {
     this.irqLatch = 0; this.irqCounter = 0; this.irqReload = false; this.irqEnabled = false; this.irqLine = false;
     this.shift = 0; this.shiftCount = 0;
     this.latch0 = 0xFE; this.latch1 = 0xFE;
+    this.command = 0;                     // FME-7: the register the next parameter write goes to
     if (this.mapper === 1) this.regs[0] = 0x0C;           // MMC1 powers up with the last bank fixed at C000
     if (this.mapper === 4) this.regs[6] = 0;
     this.update();
@@ -131,6 +134,11 @@ export class Cart {
       case 11: this.setPrg32(r[0] & 3); this.setChr8(r[0] >> 4); break;
       case 66: this.setPrg32((r[0] >> 4) & 3); this.setChr8(r[0] & 3); break;
       case 71: this.setPrg16(0, r[0]); this.setPrg16(1, last); this.setChr8(0); break;
+      case 69:
+        for (let k = 0; k < 8; k++) this.setChr1(k, r[k]);
+        this.setPrg8(0, r[9] & 0x3F); this.setPrg8(1, r[10] & 0x3F); this.setPrg8(2, r[11] & 0x3F); this.setPrg8(3, this.prgBanks8 - 1);
+        this.mirror = ['vertical', 'horizontal', 'single0', 'single1'][r[12] & 3];
+        break;
     }
     this.mirrorMap = MIRROR[this.mirror];
   }
@@ -139,12 +147,19 @@ export class Cart {
 
   cpuRead(a) {
     if (a >= 0x8000) return this.prg[this.prgMap[(a >> 13) & 3] | (a & 0x1FFF)];
+    if (this.mapper === 69 && a >= 0x6000) {
+      // FME-7 register 8: bit 6 RAM (else a PRG ROM bank) at 6000, bit 7 RAM enabled.
+      const r8 = this.regs[8];
+      if (!(r8 & 0x40)) return this.prg[(((r8 & 0x3F) % this.prgBanks8) << 13) | (a & 0x1FFF)];
+      return r8 & 0x80 ? this.prgRam[a & 0x1FFF] : null;
+    }
     if (a >= 0x6000) return this.prgRam[a & 0x1FFF];
     return null;                                          // open bus
   }
 
   cpuWrite(a, v, cycle) {
     if (a < 0x6000) return;
+    if (this.mapper === 69) { this.fme7Write(a, v); return; }
     if (a < 0x8000) { this.prgRam[a & 0x1FFF] = v; this.dirty = true; return; }
     const r = this.regs;
     switch (this.mapper) {
@@ -179,6 +194,30 @@ export class Cart {
       }
     }
     this.update();
+  }
+
+  // FME-7: 8000-9FFF picks a register, A000-BFFF writes it. 0-7 CHR banks, 8 the 6000 window,
+  // 9-B PRG banks, C mirroring, D IRQ control (bit 0 IRQ on, bit 7 counting; writing it acknowledges), E-F the counter.
+  fme7Write(a, v) {
+    const r = this.regs;
+    if (a < 0x8000) { if ((r[8] & 0xC0) === 0xC0) { this.prgRam[a & 0x1FFF] = v; this.dirty = true; } return; }
+    if (a < 0xA000) { this.command = v & 0x0F; return; }
+    if (a >= 0xC000) return;                              // (the 5B sound chip's ports, not on these boards)
+    const c = this.command;
+    if (c === 0x0D) { r[13] = v; this.irqLine = false; return; }
+    if (c === 0x0E) { this.irqCounter = (this.irqCounter & 0xFF00) | v; return; }
+    if (c === 0x0F) { this.irqCounter = (this.irqCounter & 0x00FF) | (v << 8); return; }
+    r[c] = v;
+    this.update();
+  }
+
+  // Once per CPU cycle, for mappers with a cycle counter (FME-7): count down; wrapping past 0 raises the IRQ.
+  get clocked() { return this.mapper === 69; }
+  cpuCycle() {
+    const r13 = this.regs[13];
+    if (!(r13 & 0x80)) return;
+    this.irqCounter = (this.irqCounter - 1) & 0xFFFF;
+    if (this.irqCounter === 0xFFFF && (r13 & 1)) this.irqLine = true;
   }
 
   // ---------------------------------------------------------------- PPU side (0000-1FFF)
