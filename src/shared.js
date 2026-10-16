@@ -48,10 +48,12 @@ export async function withLoading(label, work) {
 
 let toastTimer = 0;
 // Short message at the bottom of the screen; errors unless `info` is set.
-export function toast(msg, { info = false } = {}) {
+// Errors show red, success green (success), and notes in the app's accent color (info).
+export function toast(msg, { info = false, success = false } = {}) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.toggle('info', info);
+  el.classList.toggle('success', success);
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 4000);

@@ -551,6 +551,7 @@ label.switch input:focus-visible + i { outline: 2px solid var(--accent); outline
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 #toast.info { background: var(--panel); border-color: var(--accent); }
+#toast.success { background: #123a1f; border-color: #2e9a4f; }
 
 /* Pause: the bar button swaps its icon, and a veil over the game says so. */
 #pauseBtn .i-play { display: none; }
