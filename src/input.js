@@ -23,6 +23,7 @@ export class Input {
     this.uiSelect = false;    // the top-bar buttons
     this.uiStart = false;
     this.onActivity = null;   // called on keyboard or gamepad input
+    this.padStartHeld = false; // the gamepad's Start resumed the game: not a press for it until let go
     // Extra sources (touch controls): objects with dir() -> direction bits
     // (0x10 up, 0x20 down, 0x40 left, 0x80 right), a() and b() -> bool.
     this.sources = [];
@@ -65,7 +66,8 @@ export class Input {
       if (b(1) || b(3)) p |= BTN.a;
       if (b(0) || b(2)) p |= BTN.b;
       if (b(8)) p |= BTN.select;
-      if (b(9)) p |= BTN.start;
+      if (b(9) && !this.padStartHeld) p |= BTN.start;    // Start (not the press that just resumed from a pause)
+      if (!b(9)) this.padStartHeld = false;
       if (p && this.onActivity) this.onActivity();
       bits |= p;
       break;                    // one player
@@ -76,4 +78,19 @@ export class Input {
     if ((bits & (BTN.up | BTN.down)) === (BTN.up | BTN.down)) bits &= ~(BTN.up | BTN.down);
     return bits;
   }
+}
+
+// The controls, as [keys, what they do] rows for the keyboard or gamepad hints
+// (mode 'keys' or 'pad'). Gamepads go by position, as on a Nintendo pad.
+export function controlLegend(mode) {
+  const keys = mode === 'keys';
+  const rows = [
+    [keys ? 'Arrows  or  W A S D' : 'D-pad  ·  left stick', 'D-pad'],
+    [keys ? 'X  or  K' : 'Right or top button', 'A'],
+    [keys ? 'Z  or  J' : 'Bottom or left button', 'B'],
+    [keys ? 'Return' : 'Start', 'Start'],
+    [keys ? 'Shift  or  Backspace' : 'Select / Back', 'Select'],
+  ];
+  if (keys) rows.push(['P', 'Pause']);
+  return rows;
 }

@@ -48,7 +48,10 @@
   </header>
 
   <!-- Shown while the game is paused; tapping it resumes. -->
-  <div id="paused" hidden><div class="card"><b>Paused</b><span id="pausedGame" class="game"></span><span>Tap to resume</span></div></div>
+  <div id="paused" hidden><div class="card"><b>Paused</b><span id="pausedGame" class="game"></span><span class="for-touch">Tap to resume</span><span class="for-keys">Press P or click to resume</span><span class="for-pad">Press Start to resume</span></div></div>
+
+  <!-- Keyboard and gamepad players: the controls, shown as a game starts and while paused (touch players get the zone outlines). -->
+  <div id="keyHelp" aria-hidden="true"><div class="card"><dl id="keyHelpList"></dl></div></div>
 
   <!-- A game started from power-on (not resumed from a save) says so for a few seconds; tapping dismisses it. -->
   <div id="booting" hidden><div class="card"><span>Booting</span><b id="bootingGame"></b></div></div>
@@ -64,6 +67,11 @@
 
       <section class="sec-controls">
         <h2>Controls</h2>
+        <div class="field inline"><span>Hints for</span><div id="hintsFor" class="seg">
+          <button data-mode="auto">Auto</button><button data-mode="touch">Touch</button><button data-mode="keys">Keys</button><button data-mode="pad">Pad</button></div></div>
+        <p id="hintsForInfo" class="hint"></p>
+        <dl id="controlList" class="control-list"></dl>
+        <div class="touch-only">
         <label class="switch"><span>Left-handed<small>A and B on the left, d-pad on the right</small></span><input id="leftHanded" type="checkbox"><i></i></label>
         <div class="field inline">
           <span>D-pad</span>
@@ -81,6 +89,7 @@
           <input id="zoneOpacity" type="range" min="10" max="100" step="5"></label>
         <label class="field slider"><span>Zone overlap <output id="zoneOverlapVal"></output></span>
           <input id="zoneOverlap" type="range" min="0" max="100" step="5"></label>
+        </div>
       </section>
 
       <section class="sec-sound">
